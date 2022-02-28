@@ -9,7 +9,7 @@ from moon import moon
 from lcd import LCD_1inch28 as hardware
 from PIL import Image,ImageDraw,ImageFont
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 pics = os.path.join(os.path.dirname(__file__),"pics")
 fonts = os.path.join(os.path.dirname(__file__),"fonts")
 FontZ = ImageFont.truetype(os.path.join(fonts, "ZakirahsHand.ttf"),14)
@@ -25,28 +25,58 @@ disp.clear()
 
 
 
-
 def test():
     image = Image.new("RGB", (disp.width, disp.height), "BLUE")
+    print(f"size = {image.size}")
     draw = ImageDraw.Draw(image)
     draw.arc((116,116,124,124),0, 360, width=4, fill ="RED")
     disp.ShowImage(image)
+    #time.sleep(5)
+
+    spacesuit = Image.open(os.path.join(pics,'spacesuit.jpg')).resize((240,240))
+    print(f"spacesuit size = {spacesuit.size}")
+    disp.ShowImage(spacesuit)
+    #time.sleep(5)
+
+    clock = Image.open(os.path.join(pics,'clock_face.png'))
+    print(f"clock size = {clock.size}")
+    disp.ShowImage(clock)
+    #time.sleep(5)
+
+    spacesuit.paste(clock,(0,0), mask=clock)
+    disp.ShowImage(spacesuit)
+    time.sleep(5)
 
 
-def getBackground(now):
-    pos = moon.position(now)
-    phasename = moon.phase(pos)
+
+def getBackground(now = datetime.datetime.now()):
+    if now is None:
+      now = datetime.datetime.now()
+
+    position = moon.position(now)
+    phasename = moon.phase(position)
     phasename = phasename.replace(' ','_')
     background = os.path.join(pics, 'moon', phasename+'.jpg')
-    return background
+
+    image = Image.new("RGB", (disp.width, disp.height), "BLACK")
+    face_height=150
+    face_width=150
+    face = Image.open(background).resize((face_height,face_width))
+    dial = Image.open(os.path.join(pics,'clock_face.png'))
+
+    x = int((disp.height-face_height)/2)
+    y = int((disp.width-face_width)/2)
+
+    image.paste(face, (x, y))
+    image.paste(dial, (0,0), mask = dial)
+
+    print(background)
+    return image
 
 
-def draw_face():
-    background = os.path.join(pics,'LCD_1inch28_1.jpg')
-    background = os.path.join(pics,'moon','First_Quarter.jpg')
+def clock_run():
+    background = getBackground()
 
-    i=0
-    ss=57
     while True:
       now = datetime.datetime.now()
       timestring = now.strftime("%H:%M:%S")
@@ -58,34 +88,32 @@ def draw_face():
 
       if h == 0: # it's a new day.  Check the lunation
         background = getBackground(now)
-        print(background)
 
-
-      image1 = Image.open(background).resize((200,200))
-      image = Image.new("RGB", (disp.width, disp.height), "BLACK")
-      image.paste(image1, (20,20))
-      draw = ImageDraw.Draw(image)
+      face = background.copy()
+      draw = ImageDraw.Draw(face)
 
       draw_hour_hand(draw, sum / (12*60))
-      draw_minute_hand(draw, m)
+      #draw_minute_hand(draw, m)
+      # smoothing the minute hand movement
+      draw_minute_hand(draw, m+(s/60))
       draw_second_hand(draw, s)
       draw.arc((116,116,124,124),0, 360, width=4, fill ="YELLOW")
 
       draw.text((120, 145),"BartCo.", fill = "WHITE",font=FontZ)
       draw.text((120, 165), timestring, fill = "WHITE",font=FontZ)
 
-      disp.ShowImage(image)
+      disp.ShowImage(face)
 
 
 def draw_hour_hand(draw, m):
     m = (m+45)
     m = m%60
-    draw_hand(draw, m, 80, "BLUE", 4)
+    draw_hand(draw, m, 80, "BLUE", 3)
 
 
 def draw_minute_hand(draw, m):
     m = (m+45)%60
-    draw_hand(draw, m, 100, "RED", 4)
+    draw_hand(draw, m, 110, "RED", 2)
 
 
 def draw_second_hand(draw, m):
@@ -114,7 +142,7 @@ def get_coordinates(m, length=100):
 if __name__ == '__main__':
     print('---- moonwatch -----')
     #test()
-    draw_face()
+    clock_run()
 
     disp.module_exit()
     logging.info("quitting")
